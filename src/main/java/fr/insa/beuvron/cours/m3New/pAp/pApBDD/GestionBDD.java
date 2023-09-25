@@ -18,16 +18,27 @@ along with CoursBeuvron.  If not, see <http://www.gnu.org/licenses/>.
  */
 package fr.insa.beuvron.cours.m3New.pAp.pApBDD;
 
-import fr.insa.beuvron.utils.ConsoleFdB;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author francois
  */
 public class GestionBDD {
+
+    private Connection conn;
+
+    public GestionBDD(Connection conn) {
+        this.conn = conn;
+    }
 
     public static Connection connectGeneralMySQL(String host,
             int port, String database,
@@ -47,7 +58,14 @@ public class GestionBDD {
         // je ne veux pas mettre le mien dans ce programme que tout le monde
         // peut télécharger
 //        return "monpass";
-        return ConsoleFdB.entreeString("pass pour serveur M3 : ");
+        // vous pouvez aussi le demander à chaque fois
+//        return ConsoleFdB.entreeString("pass pour serveur M3 : ");
+        // ici je le lit dans un fichier que j'ai exclu de git (.gitignore)
+        try (BufferedReader bin = new BufferedReader(new FileReader("pass.txt"))) {
+            return bin.readLine();
+        } catch (IOException ex) {
+            throw new Error("impossible de lire le mot de passe",ex);
+        }
     }
 
     public static Connection connectSurServeurM3() throws SQLException {
@@ -56,9 +74,23 @@ public class GestionBDD {
                 getPassPourServeurM3());
     }
 
+    public void creeSchema() throws SQLException {
+        try (Statement st = this.conn.createStatement()) {
+            st.executeUpdate(
+                    "create table li_utilisateur (\n"
+                    + "    id integer not null primary key AUTO_INCREMENT,\n"
+                    + "    nom varchar(30) not null unique,\n"
+                    + "    pass varchar(30) not null\n"
+                    + ")\n");
+        }
+    }
+
     public static void debut() {
         try (Connection con = connectSurServeurM3()) {
             System.out.println("connecté");
+            GestionBDD gestionnaire = new GestionBDD(con);
+            gestionnaire.creeSchema();
+            System.out.println("Schéma créé");
         } catch (SQLException ex) {
             throw new Error("Connection impossible", ex);
         }
@@ -66,5 +98,12 @@ public class GestionBDD {
 
     public static void main(String[] args) {
         debut();
+    }
+
+    /**
+     * @return the conn
+     */
+    public Connection getConn() {
+        return conn;
     }
 }
