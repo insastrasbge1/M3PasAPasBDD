@@ -19,6 +19,9 @@ along with CoursBeuvron.  If not, see <http://www.gnu.org/licenses/>.
 package fr.insa.beuvron.cours.m3New.pAp.pApBDD;
 
 import fr.insa.beuvron.utils.ConsoleFdB;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -47,7 +50,14 @@ public class GestionBDD {
         // je ne veux pas mettre le mien dans ce programme que tout le monde
         // peut télécharger
 //        return "monpass";
-        return ConsoleFdB.entreeString("pass pour serveur M3 : ");
+        // vous pouvez aussi le demander à chaque fois
+//        return ConsoleFdB.entreeString("pass pour serveur M3 : ");
+        // ici je le lit dans un fichier que j'ai exclu de git (.gitignore)
+        try (BufferedReader bin = new BufferedReader(new FileReader("pass.txt"))) {
+            return bin.readLine();
+        } catch (IOException ex) {
+            throw new Error("impossible de lire le mot de passe", ex);
+        }
     }
 
     public static Connection connectSurServeurM3() throws SQLException {
