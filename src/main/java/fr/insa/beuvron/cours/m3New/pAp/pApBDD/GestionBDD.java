@@ -26,6 +26,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -171,6 +173,7 @@ public class GestionBDD {
             System.out.println("================");
             System.out.println((i++) + ") lister les utilisateurs");
             System.out.println((i++) + ") ajouter un utilisateur");
+            System.out.println((i++) + ") chercher par pattern");
             System.out.println("0) Fin");
             rep = ConsoleFdB.entreeEntier("Votre choix : ");
             try {
@@ -183,6 +186,8 @@ public class GestionBDD {
                     System.out.println("entrez un nouvel utilisateur : ");
                     Utilisateur nouveau = Utilisateur.demande();
                     nouveau.saveInDBV1(this.conn);
+                } else if (rep == j++) {
+                    this.afficheUtilisateurAvecPattern();
                 }
             } catch (SQLException ex) {
                 System.out.println(ExceptionsUtils.messageEtPremiersAppelsDansPackage(ex, "fr.insa.beuvron", 5));
@@ -218,6 +223,55 @@ public class GestionBDD {
             }
         }
     }
+    
+    public void afficheUtilisateurAvecPattern() throws SQLException {
+        String patNom = ConsoleFdB.entreeString("entrez le pattern de nom : ");
+        try (PreparedStatement st = this.conn.prepareStatement(
+                "select nom,pass from li_utilisateur where nom like ?"
+        )) {
+            st.setString(1, patNom);
+            ResultSet r = st.executeQuery();
+            while (r.next()) {
+                String nom = r.getString(1);
+                String pass = r.getString("pass");
+                System.out.println(nom + " : " + pass);
+            }
+            
+        }
+    }
+
+//    public static void menuConnection() {
+//        int rep = -1;
+//        while (rep != 0) {
+//            int i = 1;
+//            System.out.println("Menu de connection");
+//            System.out.println("==================");
+//            System.out.println((i++) + ") connection sur serveur M3 comme m3_fdebertranddeb01");
+//            System.out.println((i++) + ") connection sur serveur M3 autre utilisateur");
+//            System.out.println((i++) + ") connection serveur MySQL quelconque");
+//            System.out.println("0) Fin");
+//            rep = ConsoleFdB.entreeEntier("Votre choix : ");
+//            Connection con = null;
+//            try {
+//                int j = 1;
+//                if (rep == j++) {
+//                    con = connectGeneralMySQL("92.222.25.165", 3306,
+//                            "m3_fdebertranddeb01", "m3_fdebertranddeb01",
+//                            getPassPourServeurM3());
+//
+//                } else if (rep == j++) {
+//                    String nom = ConsoleFdB.
+//                } else if (rep == j++) {
+//                    this.razBDD();
+//                } else if (rep == j++) {
+//                    this.menuUtilisateur();
+//                }
+//            } catch (SQLException ex) {
+//                System.out.println(ExceptionsUtils.messageEtPremiersAppelsDansPackage(ex, "fr.insa.beuvron", 5));
+//            }
+//        }
+//
+//    }
 
     public static void debut() {
         try (Connection con = connectSurServeurM3()) {
