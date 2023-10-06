@@ -100,7 +100,6 @@ public class GestionBDD {
                     + "    u2 integer not null\n"
                     + ")\n"
             );
-            this.conn.commit();
             st.executeUpdate(
                     "alter table li_likes \n"
                     + "    add constraint fk_li_likes_u1 \n"
@@ -111,6 +110,7 @@ public class GestionBDD {
                     + "    add constraint fk_li_likes_u2 \n"
                     + "    foreign key (u2) references li_utilisateur(id) \n"
             );
+            this.conn.commit();
         } catch (SQLException ex) {
             this.conn.rollback();
             throw ex;
