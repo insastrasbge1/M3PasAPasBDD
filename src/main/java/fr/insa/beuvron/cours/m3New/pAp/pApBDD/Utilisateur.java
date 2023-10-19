@@ -25,6 +25,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  *
@@ -32,6 +33,11 @@ import java.util.List;
  */
 public class Utilisateur {
 
+    /**
+     * l'identificateur sera fixé à -1 pour un Uilisateur non sauvegardé
+     * dans la base de donnée, sinon, ce sera l'identificateur 
+     * dans la table des utilisateurs de la base de donnée.
+     */
     private int id;
     private String nom;
     private String pass;
@@ -58,15 +64,24 @@ public class Utilisateur {
     }
 
     public void saveInDBV1(Connection con) throws SQLException {
+        if (this.id != -1) {
+            throw new Error("Utilisateur déjà sauvegardé (id = " + this.id);
+        }
         try (PreparedStatement pst = con.prepareStatement(
-                "insert into li_utilisateur (nom,pass) values (?,?)")) {
+                "insert into li_utilisateur (nom,pass) values (?,?)",
+                PreparedStatement.RETURN_GENERATED_KEYS)) {
             pst.setString(1, this.nom);
             pst.setString(2, this.pass);
             pst.executeUpdate();
+            try (ResultSet rid = pst.getGeneratedKeys()) {
+                rid.next();
+                this.id = rid.getInt(1);
+            }
         }
     }
 
-    public static List<Utilisateur> tousLesUtilisateurs(Connection con) throws SQLException {
+    public static List<Utilisateur> tousLesUtilisateurs(Connection con)
+            throws SQLException {
         List<Utilisateur> res = new ArrayList<>();
         try (PreparedStatement pst = con.prepareStatement(
                 "select id,nom,pass from li_utilisateur")) {
@@ -80,6 +95,27 @@ public class Utilisateur {
             }
         }
         return res;
+    }
+
+    public static Optional<Utilisateur> login(Connection con, String lenom, String lepass)
+            throws SQLException {
+        try (PreparedStatement pst = con.prepareStatement(
+                "select id,nom,pass from li_utilisateur \n"
+                + "  where nom = ? and pass = ?")) {
+            pst.setString(1, lenom);
+            pst.setString(2, lepass);
+            try (ResultSet rs = pst.executeQuery()) {
+                if (rs.next()) {
+                    int id = rs.getInt("id");
+                    String nom = rs.getString(2);
+                    String pass = rs.getString("pass");
+                    return Optional.of(new Utilisateur(id, nom, pass));
+                } else {
+                    return Optional.empty();
+                }
+            }
+        }
+
     }
 
     /**

@@ -26,23 +26,16 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Optional;
 
 /**
  *
  * @author francois
  */
 public class GestionBDD {
-
-    private Connection conn;
-
-    public GestionBDD(Connection conn) {
-        this.conn = conn;
-    }
 
     public static Connection connectGeneralMySQL(String host,
             int port, String database,
@@ -78,15 +71,21 @@ public class GestionBDD {
                 getPassPourServeurM3());
     }
 
+    public static Connection connectH2EmbededInMemory() throws SQLException {
+        Connection con = DriverManager.getConnection("jdbc:h2:mem:test");
+        con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+        return con;
+    }
+
     /**
      * Creation du schéma. On veut créer tout ou rien, d'où la gestion explicite
      * des transactions.
      *
      * @throws SQLException
      */
-    public void creeSchema() throws SQLException {
-        this.conn.setAutoCommit(false);
-        try (Statement st = this.conn.createStatement()) {
+    public static void creeSchema(Connection conn) throws SQLException {
+        conn.setAutoCommit(false);
+        try (Statement st = conn.createStatement()) {
             st.executeUpdate(
                     "create table li_utilisateur (\n"
                     + "    id integer not null primary key AUTO_INCREMENT,\n"
@@ -100,6 +99,7 @@ public class GestionBDD {
                     + "    u2 integer not null\n"
                     + ")\n"
             );
+            conn.commit();
             st.executeUpdate(
                     "alter table li_likes \n"
                     + "    add constraint fk_li_likes_u1 \n"
@@ -110,12 +110,11 @@ public class GestionBDD {
                     + "    add constraint fk_li_likes_u2 \n"
                     + "    foreign key (u2) references li_utilisateur(id) \n"
             );
-            this.conn.commit();
         } catch (SQLException ex) {
-            this.conn.rollback();
+            conn.rollback();
             throw ex;
         } finally {
-            this.conn.setAutoCommit(true);
+            conn.setAutoCommit(true);
         }
     }
 
@@ -126,8 +125,8 @@ public class GestionBDD {
      *
      * @throws SQLException
      */
-    public void deleteSchema() throws SQLException {
-        try (Statement st = this.conn.createStatement()) {
+    public static void deleteSchema(Connection conn) throws SQLException {
+        try (Statement st = conn.createStatement()) {
             // pour être sûr de pouvoir supprimer, il faut d'abord supprimer les liens
             // puis les tables
             // suppression des liens
@@ -152,42 +151,49 @@ public class GestionBDD {
         }
     }
 
-    public void initTest() throws SQLException {
+    public static void initTest(Connection conn) throws SQLException {
         Utilisateur fdb = new Utilisateur("fdb", "pass");
-        fdb.saveInDBV1(this.conn);
+        fdb.saveInDBV1(conn);
         Utilisateur toto = new Utilisateur("toto", "pass");
-        toto.saveInDBV1(this.conn);
+        toto.saveInDBV1(conn);
     }
 
-    public void razBDD() throws SQLException {
-        this.deleteSchema();
-        this.creeSchema();
-        this.initTest();
+    public static void razBDD(Connection conn) throws SQLException {
+        deleteSchema(conn);
+        creeSchema(conn);
+        initTest(conn);
     }
 
-    public void menuUtilisateur() {
+    public static void menuUtilisateur(Connection conn) {
         int rep = -1;
         while (rep != 0) {
             int i = 1;
             System.out.println("Menu utilisateur");
             System.out.println("================");
             System.out.println((i++) + ") lister les utilisateurs");
+            System.out.println((i++) + ") login ");
             System.out.println((i++) + ") ajouter un utilisateur");
-            System.out.println((i++) + ") chercher par pattern");
             System.out.println("0) Fin");
             rep = ConsoleFdB.entreeEntier("Votre choix : ");
             try {
                 int j = 1;
                 if (rep == j++) {
-                    List<Utilisateur> users = Utilisateur.tousLesUtilisateurs(this.conn);
+                    List<Utilisateur> users = Utilisateur.tousLesUtilisateurs(conn);
                     System.out.println(users.size() + " utilisateurs : ");
                     System.out.println(ListUtils.enumerateList(users));
                 } else if (rep == j++) {
+                    String nom = ConsoleFdB.entreeString("nom : ");
+                    String pass = ConsoleFdB.entreeString("pass : ");
+                    Optional<Utilisateur> user = Utilisateur.login(conn, nom, pass);
+                    if (user.isPresent()) {
+                        System.out.println("ok");
+                    } else {
+                        System.out.println("NON");
+                    }
+                } else if (rep == j++) {
                     System.out.println("entrez un nouvel utilisateur : ");
                     Utilisateur nouveau = Utilisateur.demande();
-                    nouveau.saveInDBV1(this.conn);
-                } else if (rep == j++) {
-                    this.afficheUtilisateurAvecPattern();
+                    nouveau.saveInDBV1(conn);
                 }
             } catch (SQLException ex) {
                 System.out.println(ExceptionsUtils.messageEtPremiersAppelsDansPackage(ex, "fr.insa.beuvron", 5));
@@ -195,7 +201,7 @@ public class GestionBDD {
         }
     }
 
-    public void menuPrincipal() {
+    public static void menuPrincipal(Connection conn) {
         int rep = -1;
         while (rep != 0) {
             int i = 1;
@@ -210,74 +216,27 @@ public class GestionBDD {
             try {
                 int j = 1;
                 if (rep == j++) {
-                    this.deleteSchema();
+                    deleteSchema(conn);
                 } else if (rep == j++) {
-                    this.creeSchema();
+                    creeSchema(conn);
                 } else if (rep == j++) {
-                    this.razBDD();
+                    razBDD(conn);
                 } else if (rep == j++) {
-                    this.menuUtilisateur();
+                    menuUtilisateur(conn);
                 }
             } catch (SQLException ex) {
                 System.out.println(ExceptionsUtils.messageEtPremiersAppelsDansPackage(ex, "fr.insa.beuvron", 5));
             }
         }
     }
-    
-    public void afficheUtilisateurAvecPattern() throws SQLException {
-        String patNom = ConsoleFdB.entreeString("entrez le pattern de nom : ");
-        try (PreparedStatement st = this.conn.prepareStatement(
-                "select nom,pass from li_utilisateur where nom like ?"
-        )) {
-            st.setString(1, patNom);
-            ResultSet r = st.executeQuery();
-            while (r.next()) {
-                String nom = r.getString(1);
-                String pass = r.getString("pass");
-                System.out.println(nom + " : " + pass);
-            }
-            
-        }
-    }
-
-//    public static void menuConnection() {
-//        int rep = -1;
-//        while (rep != 0) {
-//            int i = 1;
-//            System.out.println("Menu de connection");
-//            System.out.println("==================");
-//            System.out.println((i++) + ") connection sur serveur M3 comme m3_fdebertranddeb01");
-//            System.out.println((i++) + ") connection sur serveur M3 autre utilisateur");
-//            System.out.println((i++) + ") connection serveur MySQL quelconque");
-//            System.out.println("0) Fin");
-//            rep = ConsoleFdB.entreeEntier("Votre choix : ");
-//            Connection con = null;
-//            try {
-//                int j = 1;
-//                if (rep == j++) {
-//                    con = connectGeneralMySQL("92.222.25.165", 3306,
-//                            "m3_fdebertranddeb01", "m3_fdebertranddeb01",
-//                            getPassPourServeurM3());
-//
-//                } else if (rep == j++) {
-//                    String nom = ConsoleFdB.
-//                } else if (rep == j++) {
-//                    this.razBDD();
-//                } else if (rep == j++) {
-//                    this.menuUtilisateur();
-//                }
-//            } catch (SQLException ex) {
-//                System.out.println(ExceptionsUtils.messageEtPremiersAppelsDansPackage(ex, "fr.insa.beuvron", 5));
-//            }
-//        }
-//
-//    }
 
     public static void debut() {
-        try (Connection con = connectSurServeurM3()) {
+//        try (Connection con = connectSurServeurM3()) {
+        System.out.println("Attention : base de donnée en mémoire");
+        System.out.println(" ==> vous devez faire un RAZ de la BdD pour commencer");
+        try (Connection con = connectH2EmbededInMemory()) {
             System.out.println("connecté");
-            GestionBDD gestionnaire = new GestionBDD(con);
-            gestionnaire.menuPrincipal();
+            menuPrincipal(con);
         } catch (SQLException ex) {
             throw new Error("Connection impossible", ex);
         }
@@ -287,10 +246,4 @@ public class GestionBDD {
         debut();
     }
 
-    /**
-     * @return the conn
-     */
-    public Connection getConn() {
-        return conn;
-    }
 }
